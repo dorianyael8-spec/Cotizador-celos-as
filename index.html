@@ -2,18 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cotizador Industrial Completo</title>
+    <title>Cotizador Industrial Maestro</title>
     <style>
-        :root { --p: #2c3e50; --s: #27ae60; --bg: #f4f7f6; }
+        :root { --p: #2c3e50; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
         .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
         h2 { text-align: center; color: var(--p); border-bottom: 2px solid #eee; padding-bottom: 15px; }
         label { display: block; margin-top: 15px; font-weight: 600; color: #444; }
-        select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; }
+        select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; background: white; }
         button { width: 100%; padding: 18px; margin-top: 25px; background: var(--p); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1a252f; }
         #resultado { margin-top: 25px; padding: 20px; background: #e8f5e9; border-radius: 15px; display: none; text-align: center; border: 1px solid #c8e6c9; }
         .monto { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; margin: 10px 0; }
-        .detalles { font-size: 12px; color: #555; text-align: left; border-top: 1px solid #c8e6c9; padding-top: 10px; margin-top: 10px; }
+        .detalles { font-size: 12px; color: #555; text-align: left; border-top: 1px solid #c8e6c9; padding-top: 10px; margin-top: 10px; line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -44,7 +45,7 @@
         <option value="2.44">1.22m x 2.44m</option>
     </select>
 
-    <button id="btn" onclick="calcular()">CALCULAR COSTO TOTAL</button>
+    <button id="btn" onclick="calcular()">CALCULAR PRECIO FINAL</button>
 
     <div id="resultado">
         <small style="font-weight: bold; color: #1b5e20;">PRECIO FINAL DE VENTA</small>
@@ -54,72 +55,77 @@
 </div>
 
 <script>
-    const SHEET_ID = 'TU_ID_DE_GOOGLE_SHEETS'; 
+    // REEMPLAZA CON TU ID DE LA IMAGEN
+    const SHEET_ID = '1eF0T2m9M9v7R8E-U8j6w6Yk2u6Z5W6v6_V6u6L6_W6Y'; 
     const SHEET_NAME = 'Hoja 1';
 
     async function calcular() {
         const btn = document.getElementById('btn');
         const resDiv = document.getElementById('resultado');
-        btn.innerText = "Obteniendo datos...";
+        btn.innerText = "Sincronizando con Excel...";
         btn.disabled = true;
 
         try {
-            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
-            const resp = await fetch(url + "&c=" + Date.now());
+            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+            const resp = await fetch(url + "&nocache=" + Date.now());
             const csv = await resp.text();
-            const filas = csv.split('\n').map(r => r.split(',').map(c => c.replace(/"/g, '').trim()));
+            
+            // Limpieza profunda de datos para evitar el error de "no encontrado"
+            const filas = csv.split('\n').map(r => r.split(',').map(c => c.replace(/^"|"$/g, '').trim()));
 
             const matSel = document.getElementById('mat').value;
             const calSel = document.getElementById('cal').value.replace(/\D/g, ""); 
             const dimSel = parseFloat(document.getElementById('dim').value);
 
-            // Buscar fila de calibre
+            // Buscamos la fila comparando solo números limpios
             const d = filas.find(f => f[0] == calSel);
-            if (!d) throw new Error("Calibre no encontrado.");
 
-            // VARIABLES DINÁMICAS (G, H, I, J, K)
-            const flete     = parseFloat(filas[1][6]);
-            const moMin     = parseFloat(filas[1][7]);
-            const utilidad  = parseFloat(filas[1][8]);
-            const provMult  = parseFloat(filas[1][9]);  // J: Porcentaje Proveedor
-            const distMult  = parseFloat(filas[1][10]); // K: Porcentaje Distribuidor
+            if (!d) {
+                throw new Error(`No se encontró el Calibre ${calSel} en la columna A. Revisa que en el Excel diga exactamente ${calSel}.`);
+            }
 
-            // DATOS DE LÁMINA
-            let precioHoja = (matSel === 'inox') ? parseFloat(d[2]) : parseFloat(d[1]);
-            const tiempo   = parseFloat(d[3]);
-            const factorGas = parseFloat(d[4]);
+            // Lectura de variables globales (G=6, H=7, I=8, J=9, K=10)
+            const flete     = parseFloat(filas[1][6]) || 0;
+            const moMin     = parseFloat(filas[1][7]) || 0;
+            const utilidad  = parseFloat(filas[1][8]) || 1;
+            const provMult  = parseFloat(filas[1][9]) || 1;  // Factor Proveedor
+            const distMult  = parseFloat(filas[1][10]) || 1; // Factor Distribuidor
+
+            // Precios por material
+            let precioBase = (matSel === 'inox') ? parseFloat(d[2]) : parseFloat(d[1]);
+            const tiempo   = parseFloat(d[3]) || 0;
+            const factorGas = parseFloat(d[4]) || 0;
             const gasTanque = (matSel === 'inox') ? 2600 : 1200;
 
-            // --- CÁLCULOS ---
-            // 1. Costo Material (aplicando factor proveedor)
-            let costoMatBase = (dimSel === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
-            let costoMatConProv = costoMatBase * provMult;
+            // --- CÁLCULO EN CASCADA ---
+            // 1. Ajuste de tamaño y factor proveedor
+            let matFinal = (dimSel === 2.44) ? (precioBase * (2.44 / 3.05)) : precioBase;
+            let costoMatTotal = matFinal * provMult;
 
-            // 2. Otros costos
+            // 2. Costos de transformación
             let costoGas = gasTanque * factorGas;
             let costoMO  = tiempo * moMin;
 
-            // 3. Subtotal de producción
-            let subtotalProduccion = costoMatConProv + costoGas + costoMO + flete;
+            // 3. Precio Final: (Producción + Flete) * Utilidad * Distribuidor
+            let costoProduccion = costoMatTotal + costoGas + costoMO + flete;
+            let precioVenta = costoProduccion * utilidad * distMult;
 
-            // 4. Precio Final (Utilidad + Distribuidor)
-            let precioFinal = subtotalProduccion * utilidad * distMult;
-
-            // MOSTRAR
+            // Mostrar resultados
             resDiv.style.display = 'block';
-            document.getElementById('txtPrecio').innerText = "$ " + precioFinal.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            document.getElementById('txtPrecio').innerText = "$ " + precioVenta.toLocaleString('es-MX', {minimumFractionDigits: 2});
             document.getElementById('txtDetalle').innerHTML = `
-                • Mat. (c/Prov): $${costoMatConProv.toFixed(2)}<br>
-                • Mano de Obra: $${costoMO.toFixed(2)}<br>
-                • Gas: $${costoGas.toFixed(2)}<br>
-                • Flete: $${flete}<br>
-                <small>Incluye margen distribuidor: ${((distMult-1)*100).toFixed(0)}%</small>
+                <b>Desglose de Costos:</b><br>
+                • Lámina (c/Prov): $${costoMatTotal.toLocaleString('es-MX')}<br>
+                • Corte: $${costoMO.toLocaleString('es-MX')} | Gas: $${costoGas.toLocaleString('es-MX')}<br>
+                • Flete: $${flete.toLocaleString('es-MX')}<br>
+                <hr>
+                <small>Factores: Utilidad x${utilidad} | Distribuidor x${distMult}</small>
             `;
 
         } catch (e) {
-            alert("Error: " + e.message);
+            alert("AVISO: " + e.message);
         } finally {
-            btn.innerText = "CALCULAR COSTO TOTAL";
+            btn.innerText = "CALCULAR PRECIO FINAL";
             btn.disabled = false;
         }
     }
