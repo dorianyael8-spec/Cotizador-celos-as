@@ -3,33 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Central de Costos | Celosías Industriales</title>
+    <title>Cotizador Oficial | Celosías</title>
     <style>
         :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
         .container { background: white; width: 100%; max-width: 500px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
-        .header { text-align: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 20px; }
         label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); }
-        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
-        .btn-calc { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-calc:hover { background: #34495e; }
-        .result-card { margin-top: 25px; padding: 20px; background: #ebf5fb; border-radius: 15px; text-align: center; display: none; border: 1px solid #d6eaf8; }
-        #precioFinal { font-size: 36px; color: var(--primary); font-weight: 800; display: block; }
-        .footer-note { font-size: 11px; color: #7f8c8d; margin-top: 15px; text-align: center; }
+        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 15px; }
+        .btn-calc { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .result-card { margin-top: 25px; padding: 20px; background: #e8f5e9; border-radius: 15px; text-align: center; display: none; border: 1px solid #c8e6c9; }
+        #precioFinal { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; }
+        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 10px; border-radius: 8px; display: none; margin-top: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
-        <h2>Cotizador de Celosías</h2>
-        <p>Precios Sincronizados con la Nube</p>
-    </div>
+    <h2>Cotizador Industrial</h2>
+    
+    <div id="errorBox" class="error-msg"></div>
 
     <label>Material:</label>
     <select id="material">
-        <option value="carbon">Acero al Carbón (O2)</option>
-        <option value="inox">Acero Inoxidable (N2)</option>
+        <option value="carbon">Acero al Carbón</option>
+        <option value="inox">Acero Inoxidable</option>
     </select>
 
     <label>Calibre:</label>
@@ -49,47 +47,44 @@
         <option value="2.44">1.22m x 2.44m</option>
     </select>
 
-    <button class="btn-calc" id="btnCalcular" onclick="procesarCotizacion()">CALCULAR COSTO FINAL</button>
+    <button class="btn-calc" id="btnCalcular" onclick="obtenerDatos()">CALCULAR COSTO FINAL</button>
 
     <div class="result-card" id="resultado">
-        <small>COSTO TOTAL FINAL</small>
+        <small>PRECIO FINAL SUGERIDO</small>
         <span id="precioFinal">$ 0.00</span>
-        <div id="detalles" style="font-size: 12px; margin-top: 10px; color: #555;"></div>
-    </div>
-
-    <div class="footer-note">
-        *Los precios se actualizan automáticamente desde el panel central.
+        <div id="detalles" style="font-size: 12px; margin-top: 10px;"></div>
     </div>
 </div>
 
 <script>
-    // URL ajustada para evitar bloqueos CORS en la mayoría de los casos
-    const SHEET_ID = "1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM";
- const PROXY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
+    // USAMOS EL ENLACE DIRECTO SIN PROXYS PARA EVITAR MÁS BLOQUEOS
+    const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
 
-    async function procesarCotizacion() {
-    const btn = document.getElementById('btnCalcular');
-    btn.innerText = "Sincronizando...";
-    
-    try {
-        // Añadimos un parámetro de tiempo para evitar que el navegador use datos viejos
-        const urlConCache = PROXY_URL + "&cache=" + new Date().getTime();
+    async function obtenerDatos() {
+        const btn = document.getElementById('btnCalcular');
+        const errorBox = document.getElementById('errorBox');
+        const resDiv = document.getElementById('resultado');
         
-        const response = await fetch(urlConCache);
-        if (!response.ok) throw new Error("Respuesta de red no válida");
-        
-        const text = await response.text();
-        
-        // Si el texto recibido parece HTML en lugar de datos, algo salió mal en la publicación
-        if (text.includes("<!DOCTYPE")) {
-            alert("Error: El enlace de Google Sheets no está entregando datos. Asegúrate de publicarlo como CSV.");
-            return;
-        }
+        btn.innerText = "Conectando...";
+        errorBox.style.display = "none";
 
-        const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
-        // ... (el resto de tu código de cálculo se mantiene igual)
-        
-            // Datos de configuración (Fila 2 del Excel)
+        try {
+            // Añadimos un número aleatorio al final para forzar a Google a darnos datos nuevos
+            const finalUrl = URL_CSV + "&t=" + Math.random();
+            
+            const response = await fetch(finalUrl);
+            if (!response.ok) throw new Error("Google no respondió correctamente.");
+            
+            const csvText = await response.text();
+            
+            // Si Google nos manda a una página de inicio de sesión en vez del CSV
+            if (csvText.includes("<!DOCTYPE")) {
+                throw new Error("El Excel no está publicado como CSV o es privado.");
+            }
+
+            const filas = csvText.split("\n").map(f => f.split(",").map(c => c.trim()));
+
+            // --- VARIABLES DE EXCEL ---
             const config = {
                 gasO2: parseFloat(filas[1][0]),
                 gasN2: parseFloat(filas[1][1]),
@@ -103,33 +98,33 @@
             const cal = document.getElementById('calibre').value;
             const dim = parseFloat(document.getElementById('dimension').value);
 
-            // Buscar calibre en la matriz
             let datosCal = filas.find(f => f[0] == cal);
-            if(!datosCal) throw new Error("Calibre no encontrado");
+            if(!datosCal) throw new Error("Calibre " + cal + " no encontrado en el Excel.");
 
             const precioHoja = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
             const tiempo = parseFloat(datosCal[3]);
             const factorGas = parseFloat(datosCal[4]);
 
-            // Cálculos
+            // --- OPERACIÓN ---
             let costoMaterial = (dim === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
             let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
             let costoMO = tiempo * config.moMin;
-
             let subtotal = costoMaterial + costoGas + costoMO + config.flete;
             let total = subtotal * (1 + (config.comVen/100) + (config.comPro/100));
 
-            document.getElementById('resultado').style.display = 'block';
+            // MOSTRAR
+            resDiv.style.display = 'block';
             document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerHTML = `Material: ${mat.toUpperCase()} | Calibre: ${cal} | Tamaño: ${dim}m`;
+            document.getElementById('detalles').innerText = `Sincronización exitosa con la base de datos.`;
 
         } catch (e) {
-            alert("⚠️ ERROR DE CONEXIÓN:\n\n1. Asegúrate de estar conectado a Internet.\n2. Si estás abriendo el archivo desde tu PC, el navegador puede bloquearlo por seguridad.\n\nSOLUCIÓN: Sube el archivo a GitHub o úsalo desde un servidor.");
+            errorBox.innerText = "⚠️ " + e.message;
+            errorBox.style.display = "block";
+            console.error(e);
         } finally {
             btn.innerText = "CALCULAR COSTO FINAL";
         }
     }
 </script>
 </body>
-
 </html>
