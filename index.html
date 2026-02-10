@@ -3,27 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cotizador Industrial Celosías</title>
+    <title>Cotizador Industrial | Celosías</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        :root { --primary: #2c3e50; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
         .container { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color: var(--primary); text-align: center; margin-top: 0; font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); font-size: 14px; }
-        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; background: #fff; outline: none; }
-        .btn-calc { width: 100%; padding: 18px; background: #34495e; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: 0.3s; }
-        .btn-calc:hover { background: #2c3e50; transform: translateY(-2px); }
+        h2 { color: var(--primary); text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); }
+        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
+        .btn-calc { width: 100%; padding: 18px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
         .result-card { margin-top: 20px; padding: 20px; background: #e8f5e9; border-radius: 15px; text-align: center; display: none; border: 1px solid #c8e6c9; }
-        #precioFinal { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; margin: 5px 0; }
-        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 12px; border-radius: 10px; display: none; margin-top: 15px; font-size: 13px; text-align: center; }
+        #precioFinal { font-size: 32px; color: #2e7d32; font-weight: 800; display: block; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Cotizador Industrial</h2>
-    <div id="errorBox" class="error-msg"></div>
-
+    <h2>Cotizador Local</h2>
+    
     <label>Material:</label>
     <select id="material">
         <option value="carbon">Acero al Carbón</option>
@@ -41,85 +38,59 @@
         <option value="22">Calibre 22</option>
     </select>
 
-    <label>Tamaño de Lámina:</label>
+    <label>Tamaño:</label>
     <select id="dimension">
         <option value="3.05">1.22m x 3.05m</option>
         <option value="2.44">1.22m x 2.44m</option>
     </select>
 
-    <button class="btn-calc" id="btnCalcular" onclick="obtenerDatos()">CALCULAR COSTO FINAL</button>
+    <button class="btn-calc" onclick="calcular()">CALCULAR AHORA</button>
 
     <div class="result-card" id="resultado">
-        <small style="color: #1b5e20; font-weight: bold;">PRECIO TOTAL NETO</small>
+        <small>COSTO TOTAL</small>
         <span id="precioFinal">$ 0.00</span>
-        <div id="detalles" style="font-size: 12px; color: #444; border-top: 1px solid #c8e6c9; padding-top: 10px; margin-top: 10px;"></div>
+        <p id="detalles" style="font-size: 12px; color: #666;"></p>
     </div>
 </div>
 
 <script>
-    // Enlace forzado a HOJA 2 con gid correcto
-    const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?gid=1588820421&single=true&output=csv";
+    // TUS DATOS DIRECTOS DEL EXCEL (Copiados de tu imagen)
+    const baseDeDatos = {
+        "10": { carbon: 2000, inox: 4500, tiempo: 55, gas: 0.20 },
+        "12": { carbon: 1550, inox: 3800, tiempo: 45, gas: 0.15 },
+        "14": { carbon: 1200, inox: 3100, tiempo: 35, gas: 0.10 },
+        "16": { carbon: 950,  inox: 2400, tiempo: 25, gas: 0.08 },
+        "18": { carbon: 800,  inox: 1900, tiempo: 18, gas: 0.05 },
+        "20": { carbon: 650,  inox: 1600, tiempo: 12, gas: 0.03 },
+        "22": { carbon: 500,  inox: 1300, tiempo: 8,  gas: 0.02 }
+    };
 
-    async function obtenerDatos() {
-        const btn = document.getElementById('btnCalcular');
-        const errorBox = document.getElementById('errorBox');
-        const resDiv = document.getElementById('resultado');
+    function calcular() {
+        const mat = document.getElementById('material').value;
+        const cal = document.getElementById('calibre').value;
+        const dim = parseFloat(document.getElementById('dimension').value);
         
-        btn.innerText = "Sincronizando...";
-        btn.disabled = true;
-        errorBox.style.display = "none";
-        resDiv.style.display = "none";
+        const datos = baseDeDatos[cal];
 
-        try {
-            const response = await fetch(URL_CSV + "&nocache=" + Date.now());
-            const text = await response.text();
-            
-            // Limpieza extrema: procesamos cada celda para quitar espacios y retornos de carro
-            const filas = text.split("\n").map(f => f.split(",").map(c => c.trim().replace(/[\r\n]/g, "")));
+        // Configuraciones de costos fijos
+        const precioGas = (mat === 'inox') ? 2600 : 1200; // Nitrógeno vs Oxígeno
+        const moMinuto = 8.5;
+        const flete = 450;
+        const margen = 1.25; // 25% de utilidad e impuestos
 
-            const mat = document.getElementById('material').value;
-            // Extraemos solo el número del selector
-            const calSel = document.getElementById('calibre').value.match(/\d+/)[0]; 
-            const dim = parseFloat(document.getElementById('dimension').value);
+        // Lógica
+        let precioHoja = (mat === 'inox') ? datos.inox : datos.carbon;
+        if (dim === 2.44) precioHoja = precioHoja * (2.44 / 3.05);
 
-            // Ajustamos costos base (puedes cambiarlos aquí si quieres)
-            const config = { gasO2: 1200, gasN2: 2600, moMin: 8.5, flete: 450, utilidad: 1.25 };
+        let costoGas = precioGas * datos.gas;
+        let costoMO = datos.tiempo * moMinuto;
+        
+        let total = (precioHoja + costoGas + costoMO + flete) * margen;
 
-            // BUSCADOR ULTRA-FLEXIBLE: Compara el número sin importar si el Excel tiene espacios
-            let datosCal = filas.find(f => f[0] == calSel || f[0].includes(calSel));
-
-            if (!datosCal || datosCal.length < 5) {
-                throw new Error("No se reconoce el Calibre " + calSel + ". Revisa que en la Hoja 2 la columna A tenga los números 10, 12, 14...");
-            }
-
-            // Mapeo: A=0, B=1, C=2, D=3, E=4
-            // Limpiamos los precios de cualquier símbolo no numérico
-            const precioHoja305 = (mat === 'inox') ? 
-                parseFloat(datosCal[2].replace(/[^\d.-]/g, '')) : 
-                parseFloat(datosCal[1].replace(/[^\d.-]/g, ''));
-            
-            const tiempoMinutos = parseFloat(datosCal[3].replace(/[^\d.-]/g, ''));
-            const factorGas = parseFloat(datosCal[4].replace(/[^\d.-]/g, ''));
-
-            // CÁLCULOS FINALES
-            let costoMaterial = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
-            let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
-            let costoMO = tiempoMinutos * config.moMin;
-            
-            let total = (costoMaterial + costoGas + costoMO + config.flete) * config.utilidad;
-
-            // Mostrar Resultados
-            resDiv.style.display = 'block';
-            document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerHTML = `<b>Calibre:</b> ${calSel} | <b>Material:</b> ${mat.toUpperCase()}<br>Precios actualizados desde la nube.`;
-
-        } catch (e) {
-            errorBox.innerText = "⚠️ REVISIÓN EN HOJA 2: " + e.message;
-            errorBox.style.display = "block";
-        } finally {
-            btn.innerText = "CALCULAR COSTO FINAL";
-            btn.disabled = false;
-        }
+        // Mostrar
+        document.getElementById('resultado').style.display = 'block';
+        document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+        document.getElementById('detalles').innerText = "Cálculo basado en tablas internas (Sin errores de conexión).";
     }
 </script>
 </body>
