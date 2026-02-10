@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cotizador Oficial | Celosías</title>
+    <title>Cotizador Industrial Celosías</title>
     <style>
         :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
         .container { background: white; width: 100%; max-width: 500px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
-        h2 { color: var(--primary); text-align: center; margin-bottom: 20px; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 20px; font-size: 24px; }
         label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); }
-        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 15px; }
-        .btn-calc { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; background-color: #fff; }
+        .btn-calc { width: 100%; padding: 18px; background: #34495e; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-calc:hover { background: #2c3e50; }
         .result-card { margin-top: 25px; padding: 20px; background: #e8f5e9; border-radius: 15px; text-align: center; display: none; border: 1px solid #c8e6c9; }
         #precioFinal { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; }
-        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 10px; border-radius: 8px; display: none; margin-top: 10px; font-size: 13px; }
+        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 10px; border-radius: 8px; display: none; margin-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>Cotizador Industrial</h2>
-    
     <div id="errorBox" class="error-msg"></div>
 
     <label>Material:</label>
@@ -50,76 +50,77 @@
     <button class="btn-calc" id="btnCalcular" onclick="obtenerDatos()">CALCULAR COSTO FINAL</button>
 
     <div class="result-card" id="resultado">
-        <small>PRECIO FINAL SUGERIDO</small>
+        <small>COSTO TOTAL FINAL</small>
         <span id="precioFinal">$ 0.00</span>
-        <div id="detalles" style="font-size: 12px; margin-top: 10px;"></div>
+        <div id="detalles" style="font-size: 13px; margin-top: 10px; color: #444;"></div>
     </div>
 </div>
 
 <script>
-    // USAMOS EL ENLACE DIRECTO SIN PROXYS PARA EVITAR MÁS BLOQUEOS
-    const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
+    // Tu enlace de Google Sheets Hoja 2
+    const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?gid=1588820421&single=true&output=csv";
 
-   async function obtenerDatos() {
+    async function obtenerDatos() {
         const btn = document.getElementById('btnCalcular');
         const errorBox = document.getElementById('errorBox');
         const resDiv = document.getElementById('resultado');
         
-        btn.innerText = "Buscando en Excel...";
+        btn.innerText = "Cargando datos...";
         errorBox.style.display = "none";
-        resDiv.style.display = "none";
 
         try {
-            const finalUrl = URL_CSV + "&t=" + Math.random();
-            const response = await fetch(finalUrl);
+            const response = await fetch(URL_CSV + "&cache=" + Math.random());
             const csvText = await response.text();
             
-            // Convertimos el CSV en una lista de datos limpia
+            // Separamos por filas y limpiamos espacios
             const filas = csvText.split("\n").map(f => f.split(",").map(c => c.trim()));
 
-            // 1. Cargamos la configuración (Fila 2)
+            // Configuraciones fijas (Puedes ajustarlas aquí o en otra hoja)
             const config = {
-                gasO2: parseFloat(filas[1][0]) || 0,
-                gasN2: parseFloat(filas[1][1]) || 0,
-                moMin: parseFloat(filas[1][2]) || 0,
-                flete: parseFloat(filas[1][3]) || 0,
-                comVen: parseFloat(filas[1][4]) || 0,
-                comPro: parseFloat(filas[1][5]) || 0
+                gasO2: 1200,   // Precio tanque O2
+                gasN2: 2500,   // Precio tanque N2
+                moMin: 8.5,    // Mano de obra por minuto
+                flete: 450,    // Flete base
+                comVen: 10,    // % Vendedor
+                comPro: 5      // % Proveedor
             };
 
             const mat = document.getElementById('material').value;
-            const calSeleccionado = document.getElementById('calibre').value;
+            const calSel = document.getElementById('calibre').value;
             const dim = parseFloat(document.getElementById('dimension').value);
 
-            // 2. BUSCADOR MEJORADO: Busca el calibre aunque haya filas vacías
-            let datosCal = filas.find(f => f[0] == calSeleccionado || f[0] === "Calibre " + calSeleccionado);
+            // BUSCAR CALIBRE (Empezamos desde la fila 1 porque la 0 son los títulos)
+            let datosCal = filas.find(f => f[0] == calSel);
 
             if(!datosCal) {
-                throw new Error("No se encontró el Calibre " + calSeleccionado + " en tu Excel. Revisa que la primera columna tenga los números 10, 12, 14, etc.");
+                throw new Error("No se encontró el Calibre " + calSel + " en la tabla.");
             }
 
-            // 3. Extracción de costos (Asegúrate de que las columnas coincidan con tu Excel)
-            const precioHoja = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
-            const tiempo = parseFloat(datosCal[3]) || 0;
-            const factorGas = parseFloat(datosCal[4]) || 0;
+            // Mapeo según tu imagen: A=Calibre, B=Carbon, C=Inox, D=Tiempo, E=Gas
+            const precioHoja305 = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
+            const tiempoMinutos = parseFloat(datosCal[3]);
+            const factorGas = parseFloat(datosCal[4]);
 
-            if (isNaN(precioHoja)) throw new Error("El precio para este calibre no es un número válido en el Excel.");
-
-            // --- CÁLCULOS ---
-            let costoMaterial = (dim === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
+            // CÁLCULOS
+            let costoMaterial = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
             let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
-            let costoMO = tiempo * config.moMin;
-            let subtotal = costoMaterial + costoGas + costoMO + config.flete;
-            let total = subtotal * (1 + (config.comVen/100) + (config.comPro/100));
+            let costoMO = tiempoMinutos * config.moMin;
+            
+            let costoProduccion = costoMaterial + costoGas + costoMO + config.flete;
+            let total = costoProduccion * (1 + (config.comVen/100) + (config.comPro/100));
 
-            // MOSTRAR RESULTADO
+            // MOSTRAR RESULTADOS
             resDiv.style.display = 'block';
             document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerHTML = `<strong>Sincronización Exitosa</strong><br>Calculado para Calibre ${calSeleccionado} en Acero ${mat.toUpperCase()}`;
+            document.getElementById('detalles').innerHTML = `
+                <b>Desglose:</b> Material $${costoMaterial.toFixed(2)} | 
+                Gas $${costoGas.toFixed(2)} | MO $${costoMO.toFixed(2)}
+            `;
 
         } catch (e) {
-            errorBox.innerText = "⚠️ DETALLE EN EXCEL: " + e.message;
+            errorBox.innerText = "⚠️ Error: " + e.message;
             errorBox.style.display = "block";
+            console.error(e);
         } finally {
             btn.innerText = "CALCULAR COSTO FINAL";
         }
