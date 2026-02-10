@@ -3,31 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cotizador Industrial | Celosías</title>
+    <title>Cotizador Maestro | Celosías</title>
     <style>
-        :root { --primary: #2c3e50; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
-        .container { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color: var(--primary); text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); }
-        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
-        .btn-calc { width: 100%; padding: 18px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; }
-        .result-card { margin-top: 20px; padding: 20px; background: #e8f5e9; border-radius: 15px; text-align: center; display: none; border: 1px solid #c8e6c9; }
-        #precioFinal { font-size: 32px; color: #2e7d32; font-weight: 800; display: block; }
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .container { background: white; width: 100%; max-width: 450px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        h2 { color: var(--primary); text-align: center; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 15px; font-size: 24px; }
+        label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); font-size: 14px; }
+        select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 16px; background: #fff; outline: none; appearance: none; cursor: pointer; }
+        .btn-calc { width: 100%; padding: 18px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 25px; transition: all 0.3s; }
+        .btn-calc:hover { background: #1a252f; transform: scale(1.02); }
+        .result-card { margin-top: 25px; padding: 20px; background: #ebf9f1; border-radius: 15px; text-align: center; display: none; border: 2px solid #c8e6c9; animation: slideUp 0.4s ease; }
+        #precioFinal { font-size: 38px; color: #2e7d32; font-weight: 800; display: block; margin: 10px 0; }
+        .detalles { font-size: 13px; color: #555; line-height: 1.6; border-top: 1px solid #c8e6c9; padding-top: 10px; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Cotizador Local</h2>
+    <h2>Cotizador de Celosías</h2>
     
-    <label>Material:</label>
+    <label>Tipo de Material:</label>
     <select id="material">
         <option value="carbon">Acero al Carbón</option>
         <option value="inox">Acero Inoxidable</option>
     </select>
 
-    <label>Calibre:</label>
+    <label>Calibre (Grosor):</label>
     <select id="calibre">
         <option value="10">Calibre 10</option>
         <option value="12">Calibre 12</option>
@@ -38,31 +41,31 @@
         <option value="22">Calibre 22</option>
     </select>
 
-    <label>Tamaño:</label>
+    <label>Dimensiones de Lámina:</label>
     <select id="dimension">
-        <option value="3.05">1.22m x 3.05m</option>
-        <option value="2.44">1.22m x 2.44m</option>
+        <option value="3.05">1.22m x 3.05m (Estándar)</option>
+        <option value="2.44">1.22m x 2.44m (Chica)</option>
     </select>
 
-    <button class="btn-calc" onclick="calcular()">CALCULAR AHORA</button>
+    <button class="btn-calc" onclick="calcular()">CALCULAR PRECIO</button>
 
     <div class="result-card" id="resultado">
-        <small>COSTO TOTAL</small>
+        <small style="color: #2e7d32; font-weight: bold; text-transform: uppercase;">Precio Sugerido</small>
         <span id="precioFinal">$ 0.00</span>
-        <p id="detalles" style="font-size: 12px; color: #666;"></p>
+        <div class="detalles" id="info"></div>
     </div>
 </div>
 
 <script>
-    // TUS DATOS DIRECTOS DEL EXCEL (Copiados de tu imagen)
-    const baseDeDatos = {
-        "10": { carbon: 2000, inox: 4500, tiempo: 55, gas: 0.20 },
-        "12": { carbon: 1550, inox: 3800, tiempo: 45, gas: 0.15 },
-        "14": { carbon: 1200, inox: 3100, tiempo: 35, gas: 0.10 },
-        "16": { carbon: 950,  inox: 2400, tiempo: 25, gas: 0.08 },
-        "18": { carbon: 800,  inox: 1900, tiempo: 18, gas: 0.05 },
-        "20": { carbon: 650,  inox: 1600, tiempo: 12, gas: 0.03 },
-        "22": { carbon: 500,  inox: 1300, tiempo: 8,  gas: 0.02 }
+    // BASE DE DATOS LOCAL (Tus valores de la imagen)
+    const PRECIOS_BASE = {
+        "10": { carb: 2000, inox: 4500, min: 55, gas: 0.20 },
+        "12": { carb: 1550, inox: 3800, min: 45, gas: 0.15 },
+        "14": { carb: 1200, inox: 3100, min: 35, gas: 0.10 },
+        "16": { carb: 950,  inox: 2400, min: 25, gas: 0.08 },
+        "18": { carb: 800,  inox: 1900, min: 18, gas: 0.05 },
+        "20": { carb: 650,  inox: 1600, min: 12, gas: 0.03 },
+        "22": { carb: 500,  inox: 1300, min: 8,  gas: 0.02 }
     };
 
     function calcular() {
@@ -70,28 +73,24 @@
         const cal = document.getElementById('calibre').value;
         const dim = parseFloat(document.getElementById('dimension').value);
         
-        const datos = baseDeDatos[cal];
+        const datos = PRECIOS_BASE[cal];
 
-        // Configuraciones de costos fijos
-        const precioGas = (mat === 'inox') ? 2600 : 1200; // Nitrógeno vs Oxígeno
-        const moMinuto = 8.5;
-        const flete = 450;
-        const margen = 1.25; // 25% de utilidad e impuestos
+        // --- AJUSTES DE COSTOS OPERATIVOS ---
+        const costoTanque = (mat === 'inox') ? 2500 : 1200; // Nitrógeno vs Oxígeno
+        const manoObraMinuto = 8.5; // Costo por minuto de corte
+        const fleteBase = 450;      // Flete por lámina
+        const utilidadImpuestos = 1.30; // Margen del 30% (Ajustable)
 
-        // Lógica
-        let precioHoja = (mat === 'inox') ? datos.inox : datos.carbon;
-        if (dim === 2.44) precioHoja = precioHoja * (2.44 / 3.05);
-
-        let costoGas = precioGas * datos.gas;
-        let costoMO = datos.tiempo * moMinuto;
+        // --- MATEMÁTICA ---
+        let precioHoja = (mat === 'inox') ? datos.inox : datos.carb;
         
-        let total = (precioHoja + costoGas + costoMO + flete) * margen;
+        // Si es lámina chica (2.44), se calcula la proporción del precio
+        if (dim === 2.44) {
+            precioHoja = precioHoja * (2.44 / 3.05);
+        }
 
-        // Mostrar
-        document.getElementById('resultado').style.display = 'block';
-        document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-        document.getElementById('detalles').innerText = "Cálculo basado en tablas internas (Sin errores de conexión).";
-    }
-</script>
-</body>
-</html>
+        let totalGas = costoTanque * datos.gas;
+        let totalMO = datos.min * manoObraMinuto;
+        
+        let subtotal = precioHoja + totalGas + totalMO + fleteBase;
+        let totalFinal = subtotal * utilidadImp
