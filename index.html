@@ -65,19 +65,30 @@
 <script>
     // URL ajustada para evitar bloqueos CORS en la mayoría de los casos
     const SHEET_ID = "1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM";
-    const PROXY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
+ const PROXY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
 
     async function procesarCotizacion() {
-        const btn = document.getElementById('btnCalcular');
-        btn.innerText = "Obteniendo precios...";
+    const btn = document.getElementById('btnCalcular');
+    btn.innerText = "Sincronizando...";
+    
+    try {
+        // Añadimos un parámetro de tiempo para evitar que el navegador use datos viejos
+        const urlConCache = PROXY_URL + "&cache=" + new Date().getTime();
         
-        try {
-            const response = await fetch(PROXY_URL);
-            if (!response.ok) throw new Error();
-            
-            const text = await response.text();
-            const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
+        const response = await fetch(urlConCache);
+        if (!response.ok) throw new Error("Respuesta de red no válida");
+        
+        const text = await response.text();
+        
+        // Si el texto recibido parece HTML en lugar de datos, algo salió mal en la publicación
+        if (text.includes("<!DOCTYPE")) {
+            alert("Error: El enlace de Google Sheets no está entregando datos. Asegúrate de publicarlo como CSV.");
+            return;
+        }
 
+        const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
+        // ... (el resto de tu código de cálculo se mantiene igual)
+        
             // Datos de configuración (Fila 2 del Excel)
             const config = {
                 gasO2: parseFloat(filas[1][0]),
@@ -120,4 +131,5 @@
     }
 </script>
 </body>
+
 </html>
