@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cotizador Oficial | Celosías</title>
+    <title>Cotizador Industrial Celosías</title>
     <style>
         :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
         .container { background: white; width: 100%; max-width: 450px; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color: var(--primary); text-align: center; margin-top: 0; font-size: 22px; }
+        h2 { color: var(--primary); text-align: center; margin-top: 0; font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); font-size: 14px; }
         select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; background: #fff; outline: none; }
-        .btn-calc { width: 100%; padding: 16px; background: #34495e; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: 0.3s; }
-        .btn-calc:hover { background: #2c3e50; }
+        .btn-calc { width: 100%; padding: 18px; background: #34495e; color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        .btn-calc:hover { background: #2c3e50; transform: translateY(-2px); }
         .result-card { margin-top: 20px; padding: 20px; background: #e8f5e9; border-radius: 15px; text-align: center; display: none; border: 1px solid #c8e6c9; }
-        #precioFinal { font-size: 32px; color: #2e7d32; font-weight: 800; display: block; }
-        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 12px; border-radius: 10px; display: none; margin-bottom: 15px; font-size: 13px; text-align: center; line-height: 1.4; }
+        #precioFinal { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; margin: 5px 0; }
+        .error-msg { color: #d32f2f; background: #ffcdd2; padding: 12px; border-radius: 10px; display: none; margin-top: 15px; font-size: 13px; text-align: center; }
     </style>
 </head>
 <body>
@@ -50,9 +50,9 @@
     <button class="btn-calc" id="btnCalcular" onclick="obtenerDatos()">CALCULAR COSTO FINAL</button>
 
     <div class="result-card" id="resultado">
-        <small style="color: #666; font-weight: bold;">COSTO TOTAL ESTIMADO</small>
+        <small style="color: #1b5e20; font-weight: bold;">PRECIO TOTAL NETO</small>
         <span id="precioFinal">$ 0.00</span>
-        <div id="detalles" style="font-size: 12px; margin-top: 10px; color: #555;"></div>
+        <div id="detalles" style="font-size: 12px; color: #444; border-top: 1px solid #c8e6c9; padding-top: 10px; margin-top: 10px;"></div>
     </div>
 </div>
 
@@ -65,63 +65,56 @@
         const errorBox = document.getElementById('errorBox');
         const resDiv = document.getElementById('resultado');
         
-        btn.innerText = "Consultando Base de Datos...";
+        btn.innerText = "Conectando...";
+        btn.disabled = true;
         errorBox.style.display = "none";
         resDiv.style.display = "none";
 
         try {
-            const response = await fetch(URL_CSV + "&t=" + Date.now());
+            const response = await fetch(URL_CSV + "&nocache=" + Date.now());
             const text = await response.text();
             
-            // Procesamos el CSV de la Hoja 2
+            // Convertimos el CSV en filas y columnas limpias
             const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
 
             const mat = document.getElementById('material').value;
-            const calSel = document.getElementById('calibre').value;
+            // Extraemos SOLO el número del selector (ej. de "Calibre 10" saca "10")
+            const calTexto = document.getElementById('calibre').value;
+            const calNumero = calTexto.replace(/\D/g, ""); 
             const dim = parseFloat(document.getElementById('dimension').value);
 
-            // Valores de configuración por defecto (ya que no están en tu Hoja 2)
-            const config = { gasO2: 1200, gasN2: 2600, moMin: 7.5, flete: 400, com: 0.15 };
+            // Valores fijos de operación (Tanques, MO, Fletes)
+            const config = { gasO2: 1200, gasN2: 2600, moMin: 8.0, flete: 450, utilidad: 1.20 };
 
-            // BUSCADOR INTELIGENTE EN COLUMNA A
-            let datosCal = null;
-            for (let i = 0; i < filas.length; i++) {
-                if (filas[i][0] == calSel) {
-                    datosCal = filas[i];
-                    break;
-                }
-            }
+            // BUSCAMOS EL CALIBRE EN LA COLUMNA A
+            let datosCal = filas.find(f => f[0] == calNumero);
 
             if (!datosCal) {
-                throw new Error("El Calibre " + calSel + " no se encuentra en la Hoja 2 del Excel. Revisa que esté escrito solo el número en la primera columna.");
+                throw new Error("No se encontró el '" + calNumero + "' en la Hoja 2. Revisa que en el Excel la columna A solo tenga el número.");
             }
 
-            // Mapeo según tu imagen: A=Cal, B=Carb, C=Inox, D=Tiempo, E=Gas
+            // Mapeo basado en tu imagen: A=0, B=1, C=2, D=3, E=4
             const precioHoja305 = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
             const tiempoMinutos = parseFloat(datosCal[3]);
             const factorGas = parseFloat(datosCal[4]);
 
-            // VALIDACIÓN DE NÚMEROS
-            if (isNaN(precioHoja305)) throw new Error("Error en los precios de la fila del Calibre " + calSel);
-
-            // --- LÓGICA DE COSTEO ---
-            let costoMaterial = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
+            // CÁLCULOS
+            let costoMat = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
             let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
             let costoMO = tiempoMinutos * config.moMin;
             
-            let subtotal = costoMaterial + costoGas + costoMO + config.flete;
-            let totalFinal = subtotal * (1 + config.com);
+            let total = (costoMat + costoGas + costoMO + config.flete) * config.utilidad;
 
-            // Mostrar Resultados
             resDiv.style.display = 'block';
-            document.getElementById('precioFinal').innerText = "$ " + totalFinal.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerHTML = `Material: ${mat.toUpperCase()} | Calibre: ${calSel}<br>Gas e Indirectos incluidos satisfactoriamente.`;
+            document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            document.getElementById('detalles').innerHTML = `<b>Calibre:</b> ${calNumero} | <b>Proceso:</b> Corte Láser`;
 
         } catch (e) {
-            errorBox.innerText = "⚠️ REVISIÓN REQUERIDA: " + e.message;
+            errorBox.innerText = "⚠️ REVISIÓN: " + e.message;
             errorBox.style.display = "block";
         } finally {
             btn.innerText = "CALCULAR COSTO FINAL";
+            btn.disabled = false;
         }
     }
 </script>
