@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Costos | Celosías Industriales</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
+        .container { background: white; width: 100%; max-width: 500px; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
+        label { display: block; margin: 15px 0 5px; font-weight: 600; color: var(--primary); }
+        select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 10px; }
+        .btn-calc { width: 100%; padding: 18px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-calc:hover { background: #34495e; }
+        .result-card { margin-top: 25px; padding: 20px; background: #ebf5fb; border-radius: 15px; text-align: center; display: none; border: 1px solid #d6eaf8; }
+        #precioFinal { font-size: 36px; color: var(--primary); font-weight: 800; display: block; }
+        .footer-note { font-size: 11px; color: #7f8c8d; margin-top: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>Cotizador de Celosías</h2>
+        <p>Precios Sincronizados con la Nube</p>
+    </div>
+
+    <label>Material:</label>
+    <select id="material">
+        <option value="carbon">Acero al Carbón (O2)</option>
+        <option value="inox">Acero Inoxidable (N2)</option>
+    </select>
+
+    <label>Calibre:</label>
+    <select id="calibre">
+        <option value="10">Calibre 10</option>
+        <option value="12">Calibre 12</option>
+        <option value="14">Calibre 14</option>
+        <option value="16">Calibre 16</option>
+        <option value="18">Calibre 18</option>
+        <option value="20">Calibre 20</option>
+        <option value="22">Calibre 22</option>
+    </select>
+
+    <label>Tamaño:</label>
+    <select id="dimension">
+        <option value="3.05">1.22m x 3.05m</option>
+        <option value="2.44">1.22m x 2.44m</option>
+    </select>
+
+    <button class="btn-calc" id="btnCalcular" onclick="procesarCotizacion()">CALCULAR COSTO FINAL</button>
+
+    <div class="result-card" id="resultado">
+        <small>COSTO TOTAL FINAL</small>
+        <span id="precioFinal">$ 0.00</span>
+        <div id="detalles" style="font-size: 12px; margin-top: 10px; color: #555;"></div>
+    </div>
+
+    <div class="footer-note">
+        *Los precios se actualizan automáticamente desde el panel central.
+    </div>
+</div>
+
+<script>
+    // URL ajustada para evitar bloqueos CORS en la mayoría de los casos
+    const SHEET_ID = "1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM";
+    const PROXY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
+
+    async function procesarCotizacion() {
+        const btn = document.getElementById('btnCalcular');
+        btn.innerText = "Obteniendo precios...";
+        
+        try {
+            const response = await fetch(PROXY_URL);
+            if (!response.ok) throw new Error();
+            
+            const text = await response.text();
+            const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
+
+            // Datos de configuración (Fila 2 del Excel)
+            const config = {
+                gasO2: parseFloat(filas[1][0]),
+                gasN2: parseFloat(filas[1][1]),
+                moMin: parseFloat(filas[1][2]),
+                flete: parseFloat(filas[1][3]),
+                comVen: parseFloat(filas[1][4]),
+                comPro: parseFloat(filas[1][5])
+            };
+
+            const mat = document.getElementById('material').value;
+            const cal = document.getElementById('calibre').value;
+            const dim = parseFloat(document.getElementById('dimension').value);
+
+            // Buscar calibre en la matriz
+            let datosCal = filas.find(f => f[0] == cal);
+            if(!datosCal) throw new Error("Calibre no encontrado");
+
+            const precioHoja = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
+            const tiempo = parseFloat(datosCal[3]);
+            const factorGas = parseFloat(datosCal[4]);
+
+            // Cálculos
+            let costoMaterial = (dim === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
+            let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
+            let costoMO = tiempo * config.moMin;
+
+            let subtotal = costoMaterial + costoGas + costoMO + config.flete;
+            let total = subtotal * (1 + (config.comVen/100) + (config.comPro/100));
+
+            document.getElementById('resultado').style.display = 'block';
+            document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            document.getElementById('detalles').innerHTML = `Material: ${mat.toUpperCase()} | Calibre: ${cal} | Tamaño: ${dim}m`;
+
+        } catch (e) {
+            alert("⚠️ ERROR DE CONEXIÓN:\n\n1. Asegúrate de estar conectado a Internet.\n2. Si estás abriendo el archivo desde tu PC, el navegador puede bloquearlo por seguridad.\n\nSOLUCIÓN: Sube el archivo a GitHub o úsalo desde un servidor.");
+        } finally {
+            btn.innerText = "CALCULAR COSTO FINAL";
+        }
+    }
+</script>
+</body>
+</html>
