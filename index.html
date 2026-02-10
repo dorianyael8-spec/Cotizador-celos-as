@@ -60,67 +60,66 @@
     // USAMOS EL ENLACE DIRECTO SIN PROXYS PARA EVITAR MÁS BLOQUEOS
     const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?output=csv";
 
-    async function obtenerDatos() {
+   async function obtenerDatos() {
         const btn = document.getElementById('btnCalcular');
         const errorBox = document.getElementById('errorBox');
         const resDiv = document.getElementById('resultado');
         
-        btn.innerText = "Conectando...";
+        btn.innerText = "Buscando en Excel...";
         errorBox.style.display = "none";
+        resDiv.style.display = "none";
 
         try {
-            // Añadimos un número aleatorio al final para forzar a Google a darnos datos nuevos
             const finalUrl = URL_CSV + "&t=" + Math.random();
-            
             const response = await fetch(finalUrl);
-            if (!response.ok) throw new Error("Google no respondió correctamente.");
-            
             const csvText = await response.text();
             
-            // Si Google nos manda a una página de inicio de sesión en vez del CSV
-            if (csvText.includes("<!DOCTYPE")) {
-                throw new Error("El Excel no está publicado como CSV o es privado.");
-            }
-
+            // Convertimos el CSV en una lista de datos limpia
             const filas = csvText.split("\n").map(f => f.split(",").map(c => c.trim()));
 
-            // --- VARIABLES DE EXCEL ---
+            // 1. Cargamos la configuración (Fila 2)
             const config = {
-                gasO2: parseFloat(filas[1][0]),
-                gasN2: parseFloat(filas[1][1]),
-                moMin: parseFloat(filas[1][2]),
-                flete: parseFloat(filas[1][3]),
-                comVen: parseFloat(filas[1][4]),
-                comPro: parseFloat(filas[1][5])
+                gasO2: parseFloat(filas[1][0]) || 0,
+                gasN2: parseFloat(filas[1][1]) || 0,
+                moMin: parseFloat(filas[1][2]) || 0,
+                flete: parseFloat(filas[1][3]) || 0,
+                comVen: parseFloat(filas[1][4]) || 0,
+                comPro: parseFloat(filas[1][5]) || 0
             };
 
             const mat = document.getElementById('material').value;
-            const cal = document.getElementById('calibre').value;
+            const calSeleccionado = document.getElementById('calibre').value;
             const dim = parseFloat(document.getElementById('dimension').value);
 
-            let datosCal = filas.find(f => f[0] == cal);
-            if(!datosCal) throw new Error("Calibre " + cal + " no encontrado en el Excel.");
+            // 2. BUSCADOR MEJORADO: Busca el calibre aunque haya filas vacías
+            let datosCal = filas.find(f => f[0] == calSeleccionado || f[0] === "Calibre " + calSeleccionado);
 
+            if(!datosCal) {
+                throw new Error("No se encontró el Calibre " + calSeleccionado + " en tu Excel. Revisa que la primera columna tenga los números 10, 12, 14, etc.");
+            }
+
+            // 3. Extracción de costos (Asegúrate de que las columnas coincidan con tu Excel)
             const precioHoja = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
-            const tiempo = parseFloat(datosCal[3]);
-            const factorGas = parseFloat(datosCal[4]);
+            const tiempo = parseFloat(datosCal[3]) || 0;
+            const factorGas = parseFloat(datosCal[4]) || 0;
 
-            // --- OPERACIÓN ---
+            if (isNaN(precioHoja)) throw new Error("El precio para este calibre no es un número válido en el Excel.");
+
+            // --- CÁLCULOS ---
             let costoMaterial = (dim === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
             let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
             let costoMO = tiempo * config.moMin;
             let subtotal = costoMaterial + costoGas + costoMO + config.flete;
             let total = subtotal * (1 + (config.comVen/100) + (config.comPro/100));
 
-            // MOSTRAR
+            // MOSTRAR RESULTADO
             resDiv.style.display = 'block';
             document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerText = `Sincronización exitosa con la base de datos.`;
+            document.getElementById('detalles').innerHTML = `<strong>Sincronización Exitosa</strong><br>Calculado para Calibre ${calSeleccionado} en Acero ${mat.toUpperCase()}`;
 
         } catch (e) {
-            errorBox.innerText = "⚠️ " + e.message;
+            errorBox.innerText = "⚠️ DETALLE EN EXCEL: " + e.message;
             errorBox.style.display = "block";
-            console.error(e);
         } finally {
             btn.innerText = "CALCULAR COSTO FINAL";
         }
@@ -128,3 +127,4 @@
 </script>
 </body>
 </html>
+
