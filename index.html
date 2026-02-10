@@ -2,24 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cotizador Dinámico | Celosías</title>
+    <title>Cotizador Industrial Completo</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #34495e; }
+        :root { --p: #2c3e50; --s: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
+        h2 { text-align: center; color: var(--p); border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        label { display: block; margin-top: 15px; font-weight: 600; color: #444; }
         select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; }
-        button { width: 100%; padding: 18px; margin-top: 25px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #1a252f; }
+        button { width: 100%; padding: 18px; margin-top: 25px; background: var(--p); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         #resultado { margin-top: 25px; padding: 20px; background: #e8f5e9; border-radius: 15px; display: none; text-align: center; border: 1px solid #c8e6c9; }
-        .monto { font-size: 34px; color: #2e7d32; font-weight: 800; display: block; margin: 10px 0; }
-        .status { font-size: 11px; color: #999; text-align: center; margin-top: 10px; }
+        .monto { font-size: 36px; color: #2e7d32; font-weight: 800; display: block; margin: 10px 0; }
+        .detalles { font-size: 12px; color: #555; text-align: left; border-top: 1px solid #c8e6c9; padding-top: 10px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Cotizador Maestro</h2>
+    <h2>Cotizador Industrial</h2>
     
     <label>Material:</label>
     <select id="mat">
@@ -44,74 +44,85 @@
         <option value="2.44">1.22m x 2.44m</option>
     </select>
 
-    <button id="btn" onclick="conectarYCalcular()">CALCULAR COSTO</button>
+    <button id="btn" onclick="calcular()">CALCULAR COSTO TOTAL</button>
 
     <div id="resultado">
-        <small>PRECIO TOTAL ACTUALIZADO:</small>
+        <small style="font-weight: bold; color: #1b5e20;">PRECIO FINAL DE VENTA</small>
         <span class="monto" id="txtPrecio">$ 0.00</span>
-        <p id="txtDetalle" style="font-size: 12px; color: #555;"></p>
+        <div class="detalles" id="txtDetalle"></div>
     </div>
-    <div class="status">Sincronizado con Base de Datos Cloud</div>
 </div>
 
 <script>
-    // 1. REEMPLAZA ESTO CON TU ID DE GOOGLE SHEETS
-    const SHEET_ID = 'TU_ID_AQUI'; 
-    const SHEET_NAME = 'Hoja 2'; // Nombre exacto de la pestaña
+    const SHEET_ID = 'TU_ID_DE_GOOGLE_SHEETS'; 
+    const SHEET_NAME = 'Hoja 1';
 
-    async function conectarYCalcular() {
+    async function calcular() {
         const btn = document.getElementById('btn');
         const resDiv = document.getElementById('resultado');
-        btn.innerText = "Consultando precios...";
+        btn.innerText = "Obteniendo datos...";
         btn.disabled = true;
 
         try {
-            // Usamos el formato CSV que es el más ligero y compatible
             const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
-            
-            const resp = await fetch(url);
+            const resp = await fetch(url + "&c=" + Date.now());
             const csv = await resp.text();
-            
-            // Limpiamos los datos del CSV (quitamos comillas y espacios)
-            const filas = csv.split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '').trim()));
+            const filas = csv.split('\n').map(r => r.split(',').map(c => c.replace(/"/g, '').trim()));
 
             const matSel = document.getElementById('mat').value;
-            const calSel = document.getElementById('cal').value;
+            const calSel = document.getElementById('cal').value.replace(/\D/g, ""); 
             const dimSel = parseFloat(document.getElementById('dim').value);
 
-            // Buscamos el calibre en la columna A
-            const datos = filas.find(f => f[0] == calSel);
+            // Buscar fila de calibre
+            const d = filas.find(f => f[0] == calSel);
+            if (!d) throw new Error("Calibre no encontrado.");
 
-            if (!datos) throw new Error("Calibre no encontrado en el Excel.");
+            // VARIABLES DINÁMICAS (G, H, I, J, K)
+            const flete     = parseFloat(filas[1][6]);
+            const moMin     = parseFloat(filas[1][7]);
+            const utilidad  = parseFloat(filas[1][8]);
+            const provMult  = parseFloat(filas[1][9]);  // J: Porcentaje Proveedor
+            const distMult  = parseFloat(filas[1][10]); // K: Porcentaje Distribuidor
 
-            // Asignamos valores según tus columnas: A=0, B=1, C=2, D=3, E=4
-            const precioHoja = (matSel === 'inox') ? parseFloat(datos[2]) : parseFloat(datos[1]);
-            const tiempo = parseFloat(datos[3]);
-            const factorGas = parseFloat(datos[4]);
+            // DATOS DE LÁMINA
+            let precioHoja = (matSel === 'inox') ? parseFloat(d[2]) : parseFloat(d[1]);
+            const tiempo   = parseFloat(d[3]);
+            const factorGas = parseFloat(d[4]);
+            const gasTanque = (matSel === 'inox') ? 2600 : 1200;
 
-            // Costos operativos (Puedes ajustarlos aquí o leerlos de otra celda)
-            const costoGas = (matSel === 'inox') ? 2600 : 1200;
-            const moMin = 8.5;
-            const flete = 450;
-            const utilidad = 1.30;
+            // --- CÁLCULOS ---
+            // 1. Costo Material (aplicando factor proveedor)
+            let costoMatBase = (dimSel === 2.44) ? (precioHoja * (2.44 / 3.05)) : precioHoja;
+            let costoMatConProv = costoMatBase * provMult;
 
-            // Operación
-            let subtotalMat = (dimSel === 2.44) ? (precioHoja * 0.8) : precioHoja;
-            let total = (subtotalMat + (costoGas * factorGas) + (tiempo * moMin) + flete) * utilidad;
+            // 2. Otros costos
+            let costoGas = gasTanque * factorGas;
+            let costoMO  = tiempo * moMin;
 
-            // Mostrar
+            // 3. Subtotal de producción
+            let subtotalProduccion = costoMatConProv + costoGas + costoMO + flete;
+
+            // 4. Precio Final (Utilidad + Distribuidor)
+            let precioFinal = subtotalProduccion * utilidad * distMult;
+
+            // MOSTRAR
             resDiv.style.display = 'block';
-            document.getElementById('txtPrecio').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('txtDetalle').innerText = `Datos obtenidos en tiempo real para Calibre ${calSel}`;
+            document.getElementById('txtPrecio').innerText = "$ " + precioFinal.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            document.getElementById('txtDetalle').innerHTML = `
+                • Mat. (c/Prov): $${costoMatConProv.toFixed(2)}<br>
+                • Mano de Obra: $${costoMO.toFixed(2)}<br>
+                • Gas: $${costoGas.toFixed(2)}<br>
+                • Flete: $${flete}<br>
+                <small>Incluye margen distribuidor: ${((distMult-1)*100).toFixed(0)}%</small>
+            `;
 
         } catch (e) {
-            alert("Error al leer la base de datos: " + e.message);
+            alert("Error: " + e.message);
         } finally {
-            btn.innerText = "CALCULAR COSTO";
+            btn.innerText = "CALCULAR COSTO TOTAL";
             btn.disabled = false;
         }
     }
 </script>
-
 </body>
 </html>
