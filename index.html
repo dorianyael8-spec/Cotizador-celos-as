@@ -57,7 +57,7 @@
 </div>
 
 <script>
-    // Enlace directo a tu HOJA 2 (gid=1588820421)
+    // Enlace forzado a HOJA 2 con gid correcto
     const URL_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXC_eyHynHl6Qc5yAU6cUZtagEEYrE01ysWaDFX1nHLQPLXR75kmx97vX-dnrXxbrNn6wke2XoDwbM/pub?gid=1588820421&single=true&output=csv";
 
     async function obtenerDatos() {
@@ -65,7 +65,7 @@
         const errorBox = document.getElementById('errorBox');
         const resDiv = document.getElementById('resultado');
         
-        btn.innerText = "Conectando...";
+        btn.innerText = "Sincronizando...";
         btn.disabled = true;
         errorBox.style.display = "none";
         resDiv.style.display = "none";
@@ -74,43 +74,47 @@
             const response = await fetch(URL_CSV + "&nocache=" + Date.now());
             const text = await response.text();
             
-            // Convertimos el CSV en filas y columnas limpias
-            const filas = text.split("\n").map(f => f.split(",").map(c => c.trim()));
+            // Limpieza extrema: procesamos cada celda para quitar espacios y retornos de carro
+            const filas = text.split("\n").map(f => f.split(",").map(c => c.trim().replace(/[\r\n]/g, "")));
 
             const mat = document.getElementById('material').value;
-            // Extraemos SOLO el número del selector (ej. de "Calibre 10" saca "10")
-            const calTexto = document.getElementById('calibre').value;
-            const calNumero = calTexto.replace(/\D/g, ""); 
+            // Extraemos solo el número del selector
+            const calSel = document.getElementById('calibre').value.match(/\d+/)[0]; 
             const dim = parseFloat(document.getElementById('dimension').value);
 
-            // Valores fijos de operación (Tanques, MO, Fletes)
-            const config = { gasO2: 1200, gasN2: 2600, moMin: 8.0, flete: 450, utilidad: 1.20 };
+            // Ajustamos costos base (puedes cambiarlos aquí si quieres)
+            const config = { gasO2: 1200, gasN2: 2600, moMin: 8.5, flete: 450, utilidad: 1.25 };
 
-            // BUSCAMOS EL CALIBRE EN LA COLUMNA A
-            let datosCal = filas.find(f => f[0] == calNumero);
+            // BUSCADOR ULTRA-FLEXIBLE: Compara el número sin importar si el Excel tiene espacios
+            let datosCal = filas.find(f => f[0] == calSel || f[0].includes(calSel));
 
-            if (!datosCal) {
-                throw new Error("No se encontró el '" + calNumero + "' en la Hoja 2. Revisa que en el Excel la columna A solo tenga el número.");
+            if (!datosCal || datosCal.length < 5) {
+                throw new Error("No se reconoce el Calibre " + calSel + ". Revisa que en la Hoja 2 la columna A tenga los números 10, 12, 14...");
             }
 
-            // Mapeo basado en tu imagen: A=0, B=1, C=2, D=3, E=4
-            const precioHoja305 = (mat === 'inox') ? parseFloat(datosCal[2]) : parseFloat(datosCal[1]);
-            const tiempoMinutos = parseFloat(datosCal[3]);
-            const factorGas = parseFloat(datosCal[4]);
+            // Mapeo: A=0, B=1, C=2, D=3, E=4
+            // Limpiamos los precios de cualquier símbolo no numérico
+            const precioHoja305 = (mat === 'inox') ? 
+                parseFloat(datosCal[2].replace(/[^\d.-]/g, '')) : 
+                parseFloat(datosCal[1].replace(/[^\d.-]/g, ''));
+            
+            const tiempoMinutos = parseFloat(datosCal[3].replace(/[^\d.-]/g, ''));
+            const factorGas = parseFloat(datosCal[4].replace(/[^\d.-]/g, ''));
 
-            // CÁLCULOS
-            let costoMat = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
+            // CÁLCULOS FINALES
+            let costoMaterial = (dim === 2.44) ? (precioHoja305 * (2.44 / 3.05)) : precioHoja305;
             let costoGas = (mat === 'inox') ? (config.gasN2 * factorGas) : (config.gasO2 * factorGas);
             let costoMO = tiempoMinutos * config.moMin;
             
-            let total = (costoMat + costoGas + costoMO + config.flete) * config.utilidad;
+            let total = (costoMaterial + costoGas + costoMO + config.flete) * config.utilidad;
 
+            // Mostrar Resultados
             resDiv.style.display = 'block';
             document.getElementById('precioFinal').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
-            document.getElementById('detalles').innerHTML = `<b>Calibre:</b> ${calNumero} | <b>Proceso:</b> Corte Láser`;
+            document.getElementById('detalles').innerHTML = `<b>Calibre:</b> ${calSel} | <b>Material:</b> ${mat.toUpperCase()}<br>Precios actualizados desde la nube.`;
 
         } catch (e) {
-            errorBox.innerText = "⚠️ REVISIÓN: " + e.message;
+            errorBox.innerText = "⚠️ REVISIÓN EN HOJA 2: " + e.message;
             errorBox.style.display = "block";
         } finally {
             btn.innerText = "CALCULAR COSTO FINAL";
