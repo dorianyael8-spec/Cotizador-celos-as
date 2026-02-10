@@ -2,23 +2,24 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cotizador Celosías</title>
+    <title>Cotizador Dinámico | Celosías</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; color: #1a2a3a; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #444; }
-        select { width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-        button { width: 100%; padding: 15px; margin-top: 20px; background: #1a2a3a; color: white; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #000; }
-        #resultado { margin-top: 20px; padding: 15px; background: #e7f3ef; border-radius: 10px; display: none; text-align: center; border: 1px solid #b7d1c4; }
-        .monto { font-size: 30px; color: #2d7a58; font-weight: bold; display: block; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #34495e; }
+        select { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; }
+        button { width: 100%; padding: 18px; margin-top: 25px; background: #2c3e50; color: white; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #1a252f; }
+        #resultado { margin-top: 25px; padding: 20px; background: #e8f5e9; border-radius: 15px; display: none; text-align: center; border: 1px solid #c8e6c9; }
+        .monto { font-size: 34px; color: #2e7d32; font-weight: 800; display: block; margin: 10px 0; }
+        .status { font-size: 11px; color: #999; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Cotizador Local</h2>
+    <h2>Cotizador Maestro</h2>
     
     <label>Material:</label>
     <select id="mat">
@@ -28,74 +29,87 @@
 
     <label>Calibre:</label>
     <select id="cal">
-        <option value="10">10</option>
-        <option value="12">12</option>
-        <option value="14">14</option>
-        <option value="16">16</option>
-        <option value="18">18</option>
-        <option value="20">20</option>
-        <option value="22">22</option>
+        <option value="10">Calibre 10</option>
+        <option value="12">Calibre 12</option>
+        <option value="14">Calibre 14</option>
+        <option value="16">Calibre 16</option>
+        <option value="18">Calibre 18</option>
+        <option value="20">Calibre 20</option>
+        <option value="22">Calibre 22</option>
     </select>
 
-    <label>Tamaño:</label>
+    <label>Tamaño de Lámina:</label>
     <select id="dim">
         <option value="3.05">1.22m x 3.05m</option>
         <option value="2.44">1.22m x 2.44m</option>
     </select>
 
-    <button onclick="ejecutarCalculo()">CALCULAR PRECIO</button>
+    <button id="btn" onclick="conectarYCalcular()">CALCULAR COSTO</button>
 
     <div id="resultado">
-        <small>TOTAL NETO:</small>
+        <small>PRECIO TOTAL ACTUALIZADO:</small>
         <span class="monto" id="txtPrecio">$ 0.00</span>
-        <p id="txtDetalle" style="font-size: 12px; color: #666;"></p>
+        <p id="txtDetalle" style="font-size: 12px; color: #555;"></p>
     </div>
+    <div class="status">Sincronizado con Base de Datos Cloud</div>
 </div>
 
 <script>
-    // Datos grabados directamente (Basados en tu imagen del Excel)
-    const TABLA = {
-        "10": { c: 2000, i: 4500, t: 55, g: 0.20 },
-        "12": { c: 1550, i: 3800, t: 45, g: 0.15 },
-        "14": { c: 1200, i: 3100, t: 35, g: 0.10 },
-        "16": { c: 950,  i: 2400, t: 25, g: 0.08 },
-        "18": { c: 800,  i: 1900, t: 18, g: 0.05 },
-        "20": { c: 650,  i: 1600, t: 12, g: 0.03 },
-        "22": { c: 500,  i: 1300, t: 8,  g: 0.02 }
-    };
+    // 1. REEMPLAZA ESTO CON TU ID DE GOOGLE SHEETS
+    const SHEET_ID = 'TU_ID_AQUI'; 
+    const SHEET_NAME = 'Hoja 2'; // Nombre exacto de la pestaña
 
-    function ejecutarCalculo() {
-        // 1. Obtener valores
-        const material = document.getElementById('mat').value;
-        const calibre = document.getElementById('cal').value;
-        const dimension = parseFloat(document.getElementById('dim').value);
-        
-        const fila = TABLA[calibre];
+    async function conectarYCalcular() {
+        const btn = document.getElementById('btn');
+        const resDiv = document.getElementById('resultado');
+        btn.innerText = "Consultando precios...";
+        btn.disabled = true;
 
-        // 2. Definir costos fijos
-        const precioGas = (material === 'inox') ? 2600 : 1200;
-        const moXMinuto = 8.5;
-        const flete = 450;
-        const utilidad = 1.25; // 25% de margen
+        try {
+            // Usamos el formato CSV que es el más ligero y compatible
+            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
+            
+            const resp = await fetch(url);
+            const csv = await resp.text();
+            
+            // Limpiamos los datos del CSV (quitamos comillas y espacios)
+            const filas = csv.split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '').trim()));
 
-        // 3. Proceso Matemático
-        let costoMaterial = (material === 'inox') ? fila.i : fila.c;
-        
-        // Ajuste por tamaño 2.44
-        if (dimension === 2.44) {
-            costoMaterial = costoMaterial * (2.44 / 3.05);
+            const matSel = document.getElementById('mat').value;
+            const calSel = document.getElementById('cal').value;
+            const dimSel = parseFloat(document.getElementById('dim').value);
+
+            // Buscamos el calibre en la columna A
+            const datos = filas.find(f => f[0] == calSel);
+
+            if (!datos) throw new Error("Calibre no encontrado en el Excel.");
+
+            // Asignamos valores según tus columnas: A=0, B=1, C=2, D=3, E=4
+            const precioHoja = (matSel === 'inox') ? parseFloat(datos[2]) : parseFloat(datos[1]);
+            const tiempo = parseFloat(datos[3]);
+            const factorGas = parseFloat(datos[4]);
+
+            // Costos operativos (Puedes ajustarlos aquí o leerlos de otra celda)
+            const costoGas = (matSel === 'inox') ? 2600 : 1200;
+            const moMin = 8.5;
+            const flete = 450;
+            const utilidad = 1.30;
+
+            // Operación
+            let subtotalMat = (dimSel === 2.44) ? (precioHoja * 0.8) : precioHoja;
+            let total = (subtotalMat + (costoGas * factorGas) + (tiempo * moMin) + flete) * utilidad;
+
+            // Mostrar
+            resDiv.style.display = 'block';
+            document.getElementById('txtPrecio').innerText = "$ " + total.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            document.getElementById('txtDetalle').innerText = `Datos obtenidos en tiempo real para Calibre ${calSel}`;
+
+        } catch (e) {
+            alert("Error al leer la base de datos: " + e.message);
+        } finally {
+            btn.innerText = "CALCULAR COSTO";
+            btn.disabled = false;
         }
-
-        let costoGas = precioGas * fila.g;
-        let costoMO = fila.t * moXMinuto;
-        
-        let subtotal = costoMaterial + costoGas + costoMO + flete;
-        let final = subtotal * utilidad;
-
-        // 4. Mostrar resultado
-        document.getElementById('resultado').style.display = 'block';
-        document.getElementById('txtPrecio').innerText = "$ " + final.toLocaleString('es-MX', {minimumFractionDigits: 2});
-        document.getElementById('txtDetalle').innerText = "Material: " + material.toUpperCase() + " | Calibre: " + calibre;
     }
 </script>
 
